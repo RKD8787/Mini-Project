@@ -64,54 +64,15 @@ function initFacultyView() {
 }
 
 // ✅ FIXED QR CODE GENERATION - Now uses network IP with larger size
-async function generateQR() {
-    console.log('🔄 Generating QR code...');
-
-    const qrCode = document.getElementById('qr-code');
-    if (!qrCode) {
-        console.error("❌ QR container not found");
-        return;
+document.addEventListener('DOMContentLoaded', function() {
+    // Check authentication
+    if(localStorage.getItem('isAuthenticated') !== 'true') {
+        window.location.href = 'login.html';
     }
-
-    qrCode.innerHTML = '<p>Generating QR code...</p>';
-
-    try {
-        const response = await fetch('/api/network-info');
-        const data = await response.json();
-
-        if (!data.networkIp) throw new Error("Network IP not found");
-
-        const studentUrl = `http://${data.networkIp}:${data.port}/student.html`;
-
-        qrCode.innerHTML = '';
-
-        const canvas = document.createElement('canvas');
-        qrCode.appendChild(canvas);
-
-        new QRious({
-            element: canvas,
-            value: studentUrl,
-            size: 280, // ✅ Increased QR code size
-            background: 'white',
-            foreground: 'black',
-            level: 'M'
-        });
-
-        console.log('✅ QR code generated for:', studentUrl);
-
-        const urlDisplay = document.createElement('p');
-        urlDisplay.style.marginTop = '15px';
-        urlDisplay.style.fontSize = '14px';
-        urlDisplay.style.color = '#666';
-        urlDisplay.style.wordBreak = 'break-all';
-        urlDisplay.textContent = `URL: ${studentUrl}`;
-        qrCode.appendChild(urlDisplay);
-
-    } catch (error) {
-        console.error('❌ QR Code generation failed:', error);
-        qrCode.innerHTML = '<p style="color: red;">QR Code generation failed. Please check console.</p>';
-    }
-}
+    
+    // Rest of your initialization code
+    initFacultyView();
+});
 
 // ✅ STUDENT VIEW INITIALIZATION - Fixed session handling
 async function initStudentView() {
