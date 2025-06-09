@@ -64,15 +64,43 @@ function initFacultyView() {
 }
 
 // ✅ FIXED QR CODE GENERATION - Now uses network IP with larger size
-document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication
-    if(localStorage.getItem('isAuthenticated') !== 'true') {
-        window.location.href = 'login.html';
+async function generateQR() {
+    const qrCode = document.getElementById('qr-code');
+    if (!qrCode) return;
+
+    qrCode.innerHTML = '<p>Generating QR code...</p>';
+
+    try {
+        // ✅ Use window.location to get the current domain
+        const studentUrl = `${window.location.origin}/student.html`;
+
+        qrCode.innerHTML = '';
+
+        const canvas = document.createElement('canvas');
+        qrCode.appendChild(canvas);
+
+        new QRious({
+            element: canvas,
+            value: studentUrl,
+            size: 360, // Increased size
+            background: 'white',
+            foreground: 'black',
+            level: 'H'
+        });
+
+        const urlDisplay = document.createElement('p');
+        urlDisplay.style.marginTop = '15px';
+        urlDisplay.style.fontSize = '14px';
+        urlDisplay.style.color = '#666';
+        urlDisplay.style.wordBreak = 'break-all';
+        urlDisplay.textContent = `URL: ${studentUrl}`;
+        qrCode.appendChild(urlDisplay);
+
+    } catch (error) {
+        console.error('QR Code generation failed:', error);
+        qrCode.innerHTML = '<p style="color: red;">QR Code generation failed.</p>';
     }
-    
-    // Rest of your initialization code
-    initFacultyView();
-});
+}
 
 // ✅ STUDENT VIEW INITIALIZATION - Fixed session handling
 async function initStudentView() {
