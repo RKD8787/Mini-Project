@@ -68,39 +68,32 @@ async function generateQR() {
     const qrCode = document.getElementById('qr-code');
     if (!qrCode) return;
 
-    qrCode.innerHTML = '<p>Generating QR code...</p>';
+    const studentUrl = `${window.location.origin}/student.html`;
 
-    try {
-        // ✅ Use window.location to get the current domain
-        const studentUrl = `${window.location.origin}/student.html`;
+    qrCode.innerHTML = ''; // Clear any loading message
 
-        qrCode.innerHTML = '';
+    const canvas = document.createElement('canvas');
+    qrCode.appendChild(canvas);
 
-        const canvas = document.createElement('canvas');
-        qrCode.appendChild(canvas);
+    new QRious({
+        element: canvas,
+        value: studentUrl,
+        size: 360, // larger for mobile scan
+        background: 'white',
+        foreground: 'black',
+        level: 'H'
+    });
 
-        new QRious({
-            element: canvas,
-            value: studentUrl,
-            size: 360, // Increased size
-            background: 'white',
-            foreground: 'black',
-            level: 'H'
-        });
+    const urlDisplay = document.createElement('p');
+    urlDisplay.style.marginTop = '10px';
+    urlDisplay.style.fontSize = '14px';
+    urlDisplay.style.wordBreak = 'break-word';
+    urlDisplay.textContent = `URL: ${studentUrl}`;
+    qrCode.appendChild(urlDisplay);
 
-        const urlDisplay = document.createElement('p');
-        urlDisplay.style.marginTop = '15px';
-        urlDisplay.style.fontSize = '14px';
-        urlDisplay.style.color = '#666';
-        urlDisplay.style.wordBreak = 'break-all';
-        urlDisplay.textContent = `URL: ${studentUrl}`;
-        qrCode.appendChild(urlDisplay);
-
-    } catch (error) {
-        console.error('QR Code generation failed:', error);
-        qrCode.innerHTML = '<p style="color: red;">QR Code generation failed.</p>';
-    }
+    console.log('✅ QR code generated for:', studentUrl);
 }
+
 
 // ✅ STUDENT VIEW INITIALIZATION - Fixed session handling
 async function initStudentView() {
