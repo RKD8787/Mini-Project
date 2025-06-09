@@ -788,7 +788,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-
+document.addEventListener('DOMContentLoaded', function() {
+    // Check authentication
+    if(localStorage.getItem('isAuthenticated') !== 'true') {
+        window.location.href = 'login.html';
+    }
+    
+    // Rest of your initialization code
+    initFacultyView();
+});
     // Close modals when clicking outside
     window.onclick = function(event) {
         const addModal = document.getElementById('add-manually-modal');
