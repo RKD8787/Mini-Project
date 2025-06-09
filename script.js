@@ -78,7 +78,7 @@ async function generateQR() {
     new QRious({
         element: canvas,
         value: studentUrl,
-        size: 360, // larger for mobile scan
+        size: 280, // larger for mobile scan
         background: 'white',
         foreground: 'black',
         level: 'H'
