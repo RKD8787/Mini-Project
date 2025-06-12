@@ -302,5 +302,11 @@
 
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
     <script src="script.js"></script>
+    <script>
+// Check authentication for faculty page
+if(localStorage.getItem('isAuthenticated') !== 'true') {
+    window.location.href = 'login.html';
+}
+</script>
 </body>
 </html>
