@@ -68,7 +68,7 @@ async function generateQR() {
     const qrCode = document.getElementById('qr-code');
     if (!qrCode) return;
 
-    const studentUrl = `${window.location.origin}/student.html`;
+    const studentUrl = `${'https://rkd8787.github.io/Mini-Project/student.html'`;
 
     qrCode.innerHTML = ''; // Clear any loading message
 
