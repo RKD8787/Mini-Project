@@ -1,31 +1,4 @@
-let sessionId = null;
-
-// ✅ FIXED: Proper session check with localStorage clearing
-async function checkSessionVersion() {
-    try {
-        const res = await fetch('/api/session');
-        const data = await res.json();
-        const newSessionId = data.sessionId;
-
-        const storedSession = localStorage.getItem('sessionId');
-
-        if (storedSession !== newSessionId.toString()) {
-            console.log("🌀 New session detected. Clearing localStorage.");
-            localStorage.removeItem('attendanceSubmitted');
-            localStorage.setItem('sessionId', newSessionId);
-            sessionId = newSessionId;
-            return true; // Session changed
-        }
-        
-        sessionId = newSessionId;
-        return false; // Session unchanged
-    } catch (err) {
-        console.error("❌ Failed to check session version:", err);
-        return false;
-    }
-}
-
-// Student data - This will be loaded from localStorage if available
+let sessionId = Date.now(); // Simple session ID
 let allStudents = [
     'Raushan Sharma', 'Qareena sadaf', 'Rohit Rathod', 'deval Gupta', 
     'Indrajeet','Arijit Singh', 'Balaji', 'Rajesh Yadav', 'Kavya Nair',
@@ -37,48 +10,80 @@ let presentStudents = [];
 let selectedStudents = [];
 let filteredStudents = [...allStudents];
 
-// ✅ MAIN INITIALIZATION - Only one entry point
+// Mock attendance data in localStorage
+function getAttendanceData() {
+    const data = localStorage.getItem('attendanceData');
+    return data ? JSON.parse(data) : {};
+}
+
+function saveAttendanceData(data) {
+    localStorage.setItem('attendanceData', JSON.stringify(data));
+}
+
+// Check if this is a new session
+function checkSessionVersion() {
+    const storedSession = localStorage.getItem('sessionId');
+    const currentSession = sessionId.toString();
+    
+    if (storedSession !== currentSession) {
+        console.log("🌀 New session detected. Clearing attendance submission flag.");
+        localStorage.removeItem('attendanceSubmitted');
+        localStorage.setItem('sessionId', currentSession);
+        return true;
+    }
+    return false;
+}
+
+// Main initialization
 document.addEventListener('DOMContentLoaded', function() {
     const currentPage = window.location.pathname;
     
-    if (currentPage.includes('student.html')) {
-        console.log('🎓 Initializing Student View');
-        initStudentView();
-    } else {
+    // Authentication check for faculty page only
+    if (currentPage.includes('index.html') || currentPage === '/' || currentPage === '') {
+        if(localStorage.getItem('isAuthenticated') !== 'true') {
+            window.location.href = 'login.html';
+            return;
+        }
         console.log('👨‍🏫 Initializing Faculty View');
         initFacultyView();
+    } else if (currentPage.includes('student.html')) {
+        console.log('🎓 Initializing Student View');
+        initStudentView();
     }
 });
 
-// ✅ FACULTY VIEW INITIALIZATION
+// Faculty view initialization
 function initFacultyView() {
-    loadStudentList(); // Load saved student list
+    loadStudentList();
     generateQR();
-    setInterval(generateQR, 30000); // Refresh QR every 30 sec
-    fetchAttendance();
+    loadAttendanceFromStorage();
     
-    // Auto-refresh attendance every 5 seconds
-    setInterval(fetchAttendance, 5000);
+    // Refresh attendance every 5 seconds
+    setInterval(loadAttendanceFromStorage, 5000);
     
     console.log('✅ Faculty view initialized');
 }
 
-// ✅ FIXED QR CODE GENERATION - Now uses network IP with larger size
-async function generateQR() {
+// Fixed QR code generation
+function generateQR() {
     const qrCode = document.getElementById('qr-code');
     if (!qrCode) return;
 
-    const studentUrl = `${'https://rkd8787.github.io/Mini-Project/student.html'`;
+    // Use current domain or GitHub Pages URL
+    const baseUrl = window.location.origin;
+    const studentUrl = baseUrl.includes('github.io') 
+        ? 'https://rkd8787.github.io/Mini-Project/student.html'
+        : baseUrl + '/student.html';
 
-    qrCode.innerHTML = ''; // Clear any loading message
+    qrCode.innerHTML = '';
 
     const canvas = document.createElement('canvas');
     qrCode.appendChild(canvas);
 
     new QRious({
         element: canvas,
-        value: 'https://rkd8787.github.io/Mini-Project/student.html',
-        size: 280, // larger for mobile scan
+        value: studentUrl,
+        size: 280,
         background: 'white',
         foreground: 'black',
         level: 'H'
@@ -94,20 +99,13 @@ async function generateQR() {
     console.log('✅ QR code generated for:', studentUrl);
 }
 
-
-// ✅ STUDENT VIEW INITIALIZATION - Fixed session handling
-async function initStudentView() {
-    const sessionChanged = await checkSessionVersion(); // ✅ Check session freshness
-    
-    // ✅ If session changed, clear the submission flag
-    if (sessionChanged) {
-        console.log("🔄 Session changed, allowing new submission");
-    }
-    
-    loadStudentList(); // Load saved student list
+// Student view initialization
+function initStudentView() {
+    checkSessionVersion();
+    loadStudentList();
     populateStudentList();
     setupStudentEventListeners();
-    setupStudentSearch(); // ✅ Initialize search functionality
+    setupStudentSearch();
     
     // Show selection page, hide success page
     const selectionPage = document.getElementById('student-selection-page');
@@ -115,14 +113,14 @@ async function initStudentView() {
     
     if (selectionPage) selectionPage.style.display = 'block';
     if (successPage) {
-        successPage.style.display = 'none'; // ✅ FIXED: Use display instead of classList
+        successPage.style.display = 'none';
         successPage.classList.add('hidden');
     }
     
     console.log('✅ Student view initialized');
 }
 
-// ✅ NEW: Setup student search functionality
+// Setup student search
 function setupStudentSearch() {
     const searchInput = document.getElementById('student-search');
     if (!searchInput) return;
@@ -140,24 +138,12 @@ function setupStudentSearch() {
         
         populateStudentList();
     });
-
-    // Clear search on Escape key
-    searchInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            e.target.value = '';
-            filteredStudents = [...allStudents];
-            populateStudentList();
-        }
-    });
 }
 
-// ✅ POPULATE STUDENT LIST WITH RADIO BUTTONS - Updated for search
+// Populate student list with radio buttons
 function populateStudentList() {
     const studentList = document.getElementById('student-list');
-    if (!studentList) {
-        console.error('❌ Student list container not found');
-        return;
-    }
+    if (!studentList) return;
 
     studentList.innerHTML = '';
 
@@ -179,7 +165,6 @@ function populateStudentList() {
             <label for="student-${index}">${student}</label>
         `;
 
-        // Add click listener for the entire div
         studentDiv.addEventListener('click', function(e) {
             if (e.target.tagName !== 'INPUT') {
                 const radio = studentDiv.querySelector('input');
@@ -188,7 +173,6 @@ function populateStudentList() {
             }
         });
 
-        // Add change listener for radio button
         const radio = studentDiv.querySelector('input');
         radio.addEventListener('change', updateStudentSelection);
 
@@ -196,12 +180,11 @@ function populateStudentList() {
     });
 }
 
-// ✅ UPDATE STUDENT SELECTION
+// Update student selection
 function updateStudentSelection() {
     const selectedRadio = document.querySelector('input[name="student"]:checked');
     const submitBtn = document.getElementById('submit-attendance');
     
-    // Remove previous selection styling
     document.querySelectorAll('.student-checkbox').forEach(div => {
         div.classList.remove('selected');
     });
@@ -216,7 +199,7 @@ function updateStudentSelection() {
     }
 }
 
-// ✅ SETUP STUDENT EVENT LISTENERS
+// Setup student event listeners
 function setupStudentEventListeners() {
     const submitBtn = document.getElementById('submit-attendance');
     const closeSuccessBtn = document.getElementById('close-success');
@@ -227,19 +210,17 @@ function setupStudentEventListeners() {
     
     if (closeSuccessBtn) {
         closeSuccessBtn.addEventListener('click', function() {
-            // Reset and show selection page again
             resetStudentSelection();
-            document.getElementById('success-page').style.display = 'none'; // ✅ FIXED
+            document.getElementById('success-page').style.display = 'none';
             document.getElementById('success-page').classList.add('hidden');
             document.getElementById('student-selection-page').style.display = 'block';
         });
     }
 }
 
-// ✅ FIXED: Submit attendance with proper session checking and success page display
-async function submitAttendance() {
-    // ✅ Check for fresh session before checking localStorage
-    await checkSessionVersion();
+// Fixed submit attendance function
+function submitAttendance() {
+    checkSessionVersion();
     
     if (localStorage.getItem('attendanceSubmitted') === 'true') {
         alert("Attendance already submitted from this device!");
@@ -252,7 +233,13 @@ async function submitAttendance() {
     }
 
     const student = selectedStudents[0];
-    console.log("📝 Submitting attendance for:", student);
+    const attendanceData = getAttendanceData();
+    
+    // Check if student already submitted
+    if (attendanceData[student]) {
+        alert("You have already submitted attendance!");
+        return;
+    }
 
     const submitBtn = document.getElementById('submit-attendance');
     if (submitBtn) {
@@ -261,27 +248,14 @@ async function submitAttendance() {
     }
 
     try {
-        const res = await fetch('/api/attendance', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ student })
-        });
-
-        console.log("📥 Response status:", res.status);
-        const data = await res.json();
-
-        if (res.status === 409) {
-            alert("You have already submitted attendance!");
-            return;
-        } else if (res.status !== 200) {
-            throw new Error(`Server error: ${res.status}`);
-        }
-
-        // ✅ Save submission status in localStorage
+        // Save attendance
+        attendanceData[student] = new Date().toLocaleString();
+        saveAttendanceData(attendanceData);
+        
+        // Mark as submitted
         localStorage.setItem('attendanceSubmitted', 'true');
         
-        // ✅ FIXED: Show success page with proper display handling
-        console.log('✅ Attendance submitted successfully, showing success page');
+        console.log('✅ Attendance submitted for:', student);
         showSuccessPage();
 
     } catch (err) {
@@ -295,54 +269,19 @@ async function submitAttendance() {
     }
 }
 
-// ✅ FIXED: Start fresh attendance with proper session handling
-function startFreshAttendance() {
-    if (!confirm("⚠️ This will clear all attendance and allow fresh submissions. Continue?")) return;
-
-    fetch('/api/attendance', {
-        method: 'DELETE'
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.sessionId) {
-            alert("✅ Fresh attendance session started!");
-            
-            // ✅ Update session ID immediately
-            sessionId = data.sessionId;
-            localStorage.setItem('sessionId', sessionId);
-            localStorage.removeItem('attendanceSubmitted');
-            
-            fetchAttendance();
-        } else {
-            alert("❌ Failed to start fresh session.");
-        }
-    })
-    .catch(err => {
-        console.error("❌ Error starting fresh session:", err);
-        alert("Something went wrong. Try again.");
-    });
-}
-
-// ✅ FIXED: Show success page with proper display handling
+// Show success page
 function showSuccessPage() {
-    console.log('🎉 Showing success page...');
-    
     const selectionPage = document.getElementById('student-selection-page');
     const successPage = document.getElementById('success-page');
     
-    if (selectionPage) {
-        selectionPage.style.display = 'none';
-    }
-    
+    if (selectionPage) selectionPage.style.display = 'none';
     if (successPage) {
-        successPage.style.display = 'block'; // ✅ FIXED: Use display block
+        successPage.style.display = 'block';
         successPage.classList.remove('hidden');
     }
-    
-    console.log('✅ Success page displayed');
 }
 
-// ✅ RESET STUDENT SELECTION
+// Reset student selection
 function resetStudentSelection() {
     selectedStudents = [];
     document.querySelectorAll('input[name="student"]').forEach(radio => {
@@ -355,31 +294,20 @@ function resetStudentSelection() {
     const submitBtn = document.getElementById('submit-attendance');
     if (submitBtn) submitBtn.disabled = true;
     
-    // Clear search
     const searchInput = document.getElementById('student-search');
     if (searchInput) searchInput.value = '';
     filteredStudents = [...allStudents];
 }
 
-// ✅ FIXED: Fetch attendance - Handle new response structure
-function fetchAttendance() {
-    fetch('/api/attendance')
-        .then(res => res.json())
-        .then(data => {
-            // ✅ Extract attendance data from the response
-            const attendanceData = data.attendanceData || {};
-            presentStudents = Object.keys(attendanceData);
-            
-            updatePresentStudentsList();
-            updatePresentCount();
-            console.log('📊 Attendance updated:', presentStudents.length, 'students present');
-        })
-        .catch(err => {
-            console.error("❌ Error fetching attendance:", err);
-        });
+// Load attendance from storage
+function loadAttendanceFromStorage() {
+    const attendanceData = getAttendanceData();
+    presentStudents = Object.keys(attendanceData);
+    updatePresentStudentsList();
+    updatePresentCount();
 }
 
-// ✅ UPDATE PRESENT STUDENTS LIST (Faculty View)
+// Update present students list
 function updatePresentStudentsList() {
     const listContainer = document.getElementById('present-students-list');
     if (!listContainer) return;
@@ -394,7 +322,7 @@ function updatePresentStudentsList() {
     }
     
     listContainer.innerHTML = '';
-    presentStudents.forEach((student, index) => {
+    presentStudents.forEach((student) => {
         const studentDiv = document.createElement('div');
         studentDiv.className = 'student-item';
         studentDiv.innerHTML = `
@@ -405,7 +333,7 @@ function updatePresentStudentsList() {
     });
 }
 
-// ✅ UPDATE PRESENT COUNT (Faculty View)
+// Update present count
 function updatePresentCount() {
     const countElement = document.getElementById('present-count');
     if (countElement) {
@@ -413,68 +341,81 @@ function updatePresentCount() {
     }
 }
 
-// ✅ REMOVE STUDENT (Faculty View)
+// Remove student
 function removeStudent(student) {
-    if (!confirm(`Are you sure you want to remove ${student} from attendance?`)) return;
+    if (!confirm(`Remove ${student} from attendance?`)) return;
 
-    fetch(`/api/attendance/${encodeURIComponent(student)}`, {
-        method: 'DELETE'
-    })
-    .then(res => {
-        if (!res.ok) {
-            throw new Error(`Failed to delete ${student}`);
-        }
-        return res.json();
-    })
-    .then(() => {
-        alert(`${student} has been removed.`);
-        fetchAttendance(); // Refresh list
-    })
-    .catch(err => {
-        console.error("❌ Remove error:", err);
-        alert("Failed to remove student from attendance.");
-    });
+    const attendanceData = getAttendanceData();
+    delete attendanceData[student];
+    saveAttendanceData(attendanceData);
+    
+    loadAttendanceFromStorage();
+    alert(`${student} removed from attendance.`);
 }
 
-// ✅ FIXED: Export attendance CSV
+// Start fresh attendance
+function startFreshAttendance() {
+    if (!confirm("⚠️ This will clear all attendance. Continue?")) return;
+
+    // Clear all attendance data
+    localStorage.removeItem('attendanceData');
+    localStorage.removeItem('attendanceSubmitted');
+    
+    // Generate new session
+    sessionId = Date.now();
+    localStorage.setItem('sessionId', sessionId);
+    
+    loadAttendanceFromStorage();
+    alert("✅ Fresh attendance session started!");
+}
+
+// Export attendance CSV
 function exportAttendanceCSV() {
-    fetch('/api/attendance')
-        .then(res => res.json())
-        .then(response => {
-            const data = response.attendanceData || {};
-            const csvRows = ['Name,Timestamp'];
-            for (const student in data) {
-                csvRows.push(`"${student}","${data[student]}"`);
-            }
+    const attendanceData = getAttendanceData();
+    const csvRows = ['Name,Timestamp'];
+    
+    for (const student in attendanceData) {
+        csvRows.push(`"${student}","${attendanceData[student]}"`);
+    }
 
-            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
 
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `attendance_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `attendance_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
 
-            URL.revokeObjectURL(url);
-            console.log('📤 Attendance exported');
-        })
-        .catch(err => {
-            console.error('❌ Export error:', err);
-            alert('Failed to export attendance');
-        });
+    URL.revokeObjectURL(url);
 }
 
-// ✅ FIXED: Faculty Add Student Manually Modal Functions
+// Add student manually
+function addStudentManually(studentName) {
+    if (!studentName) return;
+
+    const attendanceData = getAttendanceData();
+    
+    if (attendanceData[studentName]) {
+        alert('Student is already marked present!');
+        return;
+    }
+
+    attendanceData[studentName] = new Date().toLocaleString();
+    saveAttendanceData(attendanceData);
+    
+    loadAttendanceFromStorage();
+    closeAddManuallyModal();
+    alert(`${studentName} added successfully!`);
+}
+
+// Modal functions and student list management
 let facultyFilteredStudents = [...allStudents];
 
 function showAddManuallyModal() {
-    // ✅ FIX: Always sync with current student list
     facultyFilteredStudents = [...allStudents];
-    
     document.getElementById('add-manually-modal').style.display = 'block';
     populateFacultyStudentDropdown();
     
-    // Focus on search input
     const searchInput = document.getElementById('student-search');
     if (searchInput) {
         searchInput.focus();
@@ -486,12 +427,9 @@ function closeAddManuallyModal() {
     document.getElementById('add-manually-modal').style.display = 'none';
     const searchInput = document.getElementById('student-search');
     if (searchInput) searchInput.value = '';
-    
-    // ✅ FIX: Reset to current student list
     facultyFilteredStudents = [...allStudents];
 }
 
-// ✅ NEW: Populate faculty student dropdown with search
 function populateFacultyStudentDropdown() {
     const dropdown = document.getElementById('student-dropdown');
     if (!dropdown) return;
@@ -512,7 +450,6 @@ function populateFacultyStudentDropdown() {
         item.className = 'dropdown-item';
         item.textContent = student;
         
-        // Check if student is already present
         if (presentStudents.includes(student)) {
             item.style.opacity = '0.5';
             item.style.color = '#999';
@@ -526,47 +463,12 @@ function populateFacultyStudentDropdown() {
     });
 }
 
-// ✅ FIXED: Add student manually function
-function addStudentManually(studentName) {
-    if (!studentName) return;
-
-    // Check if student is already present
-    if (presentStudents.includes(studentName)) {
-        alert('Student is already marked present!');
-        return;
-    }
-
-    fetch('/api/attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ student: studentName })
-    })
-    .then(res => res.json().then(data => ({ status: res.status, data })))
-    .then(({ status, data }) => {
-        if (status === 409) {
-            alert('Student is already marked present!');
-        } else if (status === 200) {
-            alert(`${studentName} added successfully!`);
-            fetchAttendance(); // Refresh the list
-            closeAddManuallyModal();
-        } else {
-            throw new Error('Failed to add student');
-        }
-    })
-    .catch(err => {
-        console.error('❌ Add manually error:', err);
-        alert('Failed to add student');
-    });
-}
-
-// ✅ STUDENT LIST MANAGEMENT FUNCTIONS
-
+// Student list management functions
 function showStudentListModal() {
     document.getElementById('student-list-modal').style.display = 'block';
     populateStudentListDisplay();
     updateStudentCount();
     
-    // Clear search input
     const searchInput = document.getElementById('student-list-search');
     if (searchInput) searchInput.value = '';
 }
@@ -574,11 +476,9 @@ function showStudentListModal() {
 function closeStudentListModal() {
     document.getElementById('student-list-modal').style.display = 'none';
     
-    // Clear add student input
     const addInput = document.getElementById('new-student-name');
     if (addInput) addInput.value = '';
     
-    // Clear search input
     const searchInput = document.getElementById('student-list-search');
     if (searchInput) searchInput.value = '';
 }
@@ -598,69 +498,54 @@ function addNewStudent() {
         return;
     }
     
-    // Add to allStudents array
     allStudents.push(studentName);
-    allStudents.sort(); // Keep list sorted
+    allStudents.sort();
     
-    // ✅ FIX: Update filtered list for student view
     filteredStudents = [...allStudents];
-    
-    // ✅ FIX: Update faculty filtered list
     facultyFilteredStudents = [...allStudents];
     
-    // Clear input
     input.value = '';
     
-    // Refresh display
     populateStudentListDisplay();
     updateStudentCount();
     
-    // ✅ FIX: Update student view if on student page
     if (typeof populateStudentList === 'function') {
         populateStudentList();
     }
     
-    // Save to localStorage for persistence
     localStorage.setItem('studentList', JSON.stringify(allStudents));
-    
     alert(`${studentName} added successfully!`);
 }
 
-
 function deleteStudent(studentName) {
-    if (!confirm(`Are you sure you want to delete ${studentName} from the student list?`)) {
+    if (!confirm(`Delete ${studentName} from the student list?`)) {
         return;
     }
     
-    // Remove from allStudents array
     const index = allStudents.indexOf(studentName);
     if (index > -1) {
         allStudents.splice(index, 1);
     }
     
-    // ✅ FIX: Update filtered list for student view
     filteredStudents = [...allStudents];
-    
-    // ✅ FIX: Update faculty filtered list
     facultyFilteredStudents = [...allStudents];
     
     // Remove from attendance if present
-    if (presentStudents.includes(studentName)) {
-        removeStudent(studentName);
+    const attendanceData = getAttendanceData();
+    if (attendanceData[studentName]) {
+        delete attendanceData[studentName];
+        saveAttendanceData(attendanceData);
+        loadAttendanceFromStorage();
     }
     
-    // Refresh display
     populateStudentListDisplay();
     updateStudentCount();
     
-    // ✅ FIX: Update student view if on student page
     if (typeof populateStudentList === 'function') {
         populateStudentList();
     }
     
-    // Save to localStorage for persistence
     localStorage.setItem('studentList', JSON.stringify(allStudents));
-    
     alert(`${studentName} deleted successfully!`);
 }
 
@@ -710,40 +595,36 @@ function updateStudentCount() {
     }
 }
 
-// ✅ LOAD STUDENT LIST FROM LOCALSTORAGE ON INIT
 function loadStudentList() {
     const savedList = localStorage.getItem('studentList');
     if (savedList) {
         try {
             const parsedList = JSON.parse(savedList);
             if (Array.isArray(parsedList) && parsedList.length > 0) {
-                allStudents.length = 0; // Clear existing array
-                allStudents.push(...parsedList.sort()); // Add saved students
+                allStudents.length = 0;
+                allStudents.push(...parsedList.sort());
                 filteredStudents = [...allStudents];
-                console.log('✅ Student list loaded from localStorage:', allStudents.length, 'students');
+                console.log('✅ Student list loaded:', allStudents.length, 'students');
             }
         } catch (error) {
-            console.error('❌ Error loading student list from localStorage:', error);
+            console.error('❌ Error loading student list:', error);
         }
     }
 }
 
-// ✅ MODAL EVENT LISTENERS
+// Event listeners for modals and search
 document.addEventListener('DOMContentLoaded', function() {
-    // Load student list from localStorage
     loadStudentList();
     
-    // Handle search in faculty modal
+    // Faculty search
     const facultySearchInput = document.getElementById('student-search');
-    if (facultySearchInput && (window.location.pathname.includes('index.html') || !window.location.pathname.includes('student.html'))) {
+    if (facultySearchInput && !window.location.pathname.includes('student.html')) {
         facultySearchInput.addEventListener('input', function(e) {
             const searchTerm = e.target.value.toLowerCase().trim();
             
             if (searchTerm === '') {
-                // ✅ FIX: Always sync with current allStudents
                 facultyFilteredStudents = [...allStudents];
             } else {
-                // ✅ FIX: Filter from current allStudents, not old cached list
                 facultyFilteredStudents = allStudents.filter(student => 
                     student.toLowerCase().includes(searchTerm)
                 );
@@ -753,7 +634,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Handle search in student list modal
+    // Student list modal search
     const studentListSearchInput = document.getElementById('student-list-search');
     if (studentListSearchInput) {
         studentListSearchInput.addEventListener('input', function(e) {
@@ -761,7 +642,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Handle Enter key in add student input
+    // Add student on Enter key
     const addStudentInput = document.getElementById('new-student-name');
     if (addStudentInput) {
         addStudentInput.addEventListener('keypress', function(e) {
@@ -770,16 +651,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication
-    if(localStorage.getItem('isAuthenticated') !== 'true') {
-        window.location.href = 'login.html';
-    }
     
-    // Rest of your initialization code
-    initFacultyView();
-});
-    // Close modals when clicking outside
+    // Close modals on outside click
     window.onclick = function(event) {
         const addModal = document.getElementById('add-manually-modal');
         const studentListModal = document.getElementById('student-list-modal');
