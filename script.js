@@ -77,7 +77,7 @@ async function generateQR() {
 
     new QRious({
         element: canvas,
-        value: studentUrl,
+        value: 'https://rkd8787.github.io/Mini-Project/student.html',
         size: 280, // larger for mobile scan
         background: 'white',
         foreground: 'black',
