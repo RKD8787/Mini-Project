@@ -69,14 +69,20 @@ function generateQR() {
     const qrCode = document.getElementById('qr-code');
     if (!qrCode) return;
 
-    // Use current domain or GitHub Pages URL
-    const baseUrl = window.location.origin;
-    const studentUrl = baseUrl.includes('github.io') 
-        ? 'https://rkd8787.github.io/Mini-Project/student.html'
-        : baseUrl + '/student.html';
+    // Fix GitHub Pages URL detection
+    let studentUrl;
+    const currentUrl = window.location.href;
+    
+    if (currentUrl.includes('github.io')) {
+        // For GitHub Pages: https://username.github.io/repository-name/
+        const pathParts = window.location.pathname.split('/').filter(part => part);
+        const repoName = pathParts[0]; // Your repository name
+        studentUrl = `${window.location.origin}/${repoName}/student.html`;
+    } else {
+        studentUrl = `${window.location.origin}/student.html`;
+    }
 
     qrCode.innerHTML = '';
-
     const canvas = document.createElement('canvas');
     qrCode.appendChild(canvas);
 
@@ -89,14 +95,7 @@ function generateQR() {
         level: 'H'
     });
 
-    const urlDisplay = document.createElement('p');
-    urlDisplay.style.marginTop = '10px';
-    urlDisplay.style.fontSize = '14px';
-    urlDisplay.style.wordBreak = 'break-word';
-    urlDisplay.textContent = `URL: ${studentUrl}`;
-    qrCode.appendChild(urlDisplay);
-
-    console.log('✅ QR code generated for:', studentUrl);
+    console.log('QR code generated for:', studentUrl);
 }
 
 // Student view initialization
